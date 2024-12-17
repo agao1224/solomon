@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html>
+  <head>
+  <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Solomon</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.2/css/bulma.min.css">
+
+    <script>
+      const BIBLE_BOOKS = [
+        "Genesis",     // 0
+        "Exodus",      // 1
+        "Leviticus",   // 2
+        "Numbers",     // 3
+        "Deuteronomy", // 4
+        "Joshua",      // 5
+        "Judges",      // 6
+        "Ruth",        // 7
+        "1 Samuel",    // 8
+        "2 Samuel",    // 9
+        "1 Kings",     // 10
+        "2 Kings",     // 11
+        "1 Chronicles",// 12
+        "2 Chronicles",// 13
+        "Ezra",        // 14
+        "Nehemiah",    // 15
+        "Esther",      // 16
+        "Job",         // 17
+        "Psalms",      // 18
+        "Proverbs",    // 19
+        "Ecclesiastes",// 20
+        "Song of Solomon", // 21
+        "Isaiah",      // 22
+        "Jeremiah",    // 23
+        "Lamentations",// 24
+        "Ezekiel",     // 25
+        "Daniel",      // 26
+        "Hosea",       // 27
+        "Joel",        // 28
+        "Amos",        // 29
+        "Obadiah",     // 30
+        "Jonah",       // 31
+        "Micah",       // 32
+        "Nahum",       // 33
+        "Habakkuk",    // 34
+        "Zephaniah",   // 35
+        "Haggai",      // 36
+        "Zechariah",   // 37
+        "Malachi",     // 38
+        "Matthew",     // 39
+        "Mark",        // 40
+        "Luke",        // 41
+        "John",        // 42
+        "Acts",        // 43
+        "Romans",      // 44
+        "1 Corinthians", // 45
+        "2 Corinthians", // 46
+        "Galatians",   // 47
+        "Ephesians",   // 48
+        "Philippians", // 49
+        "Colossians",  // 50
+        "1 Thessalonians", // 51
+        "2 Thessalonians", // 52
+        "1 Timothy",   // 53
+        "2 Timothy",   // 54
+        "Titus",       // 55
+        "Philemon",    // 56
+        "Hebrews",     // 57
+        "James",       // 58
+        "1 Peter",     // 59
+        "2 Peter",     // 60
+        "1 John",      // 61
+        "2 John",      // 62
+        "3 John",      // 63
+        "Jude",        // 64
+        "Revelation"   // 65
+      ];
+
+    let currBook;
+    let currChapter;
+    let maxChapters;
+    let annotations;
+    let currVerseID = -1;
+    let newAnnotBody = "";
+    let annotationOpen = false;
+
+    async function fetchAnnotations() {
+      // Showing past annotations
+      let bookName = BIBLE_BOOKS[currBook];
+      let annotationBox = document.getElementById('annotation-box');
+      // clear first
+      annotationBox.innerHTML = '';
+      let annotObj = await window.db.getAnnotations(currVerseID);
+      let annotList = annotObj["annotations"];
+
+      let annotHeader = document.getElementById('annotations-header');
+      annotHeader.textContent = `${bookName}: Ch ${currChapter}, v${annotObj["verseNum"]["Versecount"]}`;
+
+      annotList.forEach(annot => {
+        let newArticle = document.createElement('article');
+        newArticle.classList.add('message', 'is-small');
+        newArticle.classList.add('my-2')
+        let newBody = document.createElement('div');
+        newBody.classList.add('message-body');
+        newBody.textContent = annot
+
+        newArticle.appendChild(newBody);
+        annotationBox.appendChild(newArticle);
+      });
+    }
+
+    function showAnnotations(verseId, bookName, chNum) {
+      let chContent = document.getElementById('chapter-content');
+      let annotCard = document.getElementById('annotations');
+      if (verseId === currVerseID && annotationOpen) {
+        annotationOpen = false;
+        annotCard.classList.add('is-hidden');  
+        return;
+      } else if (verseId === currVerseID && !annotationOpen) {
+        annotationOpen = true;
+        annotCard.classList.remove('is-hidden');
+        return;
+      }
+
+      annotCard.classList.remove('is-hidden');
+
+      annotationOpen = true;
+      currVerseID = verseId;
+      fetchAnnotations();
+    }
+
+    function createVerse(verseObj, i, bookName, chNum) {
+      let verse = document.createElement('span');
+      let verseText = verseObj["verse"];
+      let verseId = verseObj["id"];
+      verse.id = `verse-${i+1}`;
+      verse.setAttribute('data-id', verseId);
+      verse.classList.add('is-size-5');
+      verse.classList.add('has-text-white');
+      verse.classList.add('mx-1');
+      verse.classList.add('no-select');
+      verse.addEventListener('mouseover', async () => {
+        verse.classList.add('has-text-warning');
+        verse.classList.remove('has-text-white');
+      });
+      verse.addEventListener('mouseleave', async () => {
+        verse.classList.remove('has-text-warning');
+        verse.classList.add('has-text-white');
+      });
+      verse.addEventListener('click', async () => {
+        showAnnotations(verseId, bookName, chNum);
+      });
+      verse.textContent = `[${i+1}] ${verseText}`;
+      return verse;
+    }
+
+    function removeVerses() {
+      const chContent = document.getElementById('chapter-content');
+      const spans = chContent.querySelectorAll('span');
+      spans.forEach(span => span.remove());
+      // remove header if it's still there
+      const h1s = chContent.querySelectorAll('h1');
+      h1s.forEach(header => header.remove());
+      const h2s = chContent.querySelectorAll('h2');
+      h2s.forEach(header => header.remove());
+      const h3s = chContent.querySelectorAll('h3');
+      h3s.forEach(header => header.remove());
+    }
+
+    async function loadBible() {
+      const chContent = document.getElementById('chapter-content');
+      const books = await window.db.getBibleBooks();
+      const bookList = document.getElementById('book-list'); 
+
+      const closeBtn = document.getElementById('close');
+      closeBtn.addEventListener('click', async () => {
+        let annotCard = document.getElementById('annotations');
+        annotCard.classList.add('is-hidden');
+        newAnnotBody = "";
+
+        let annotTextarea = document.getElementById('annotation-textarea');
+        annotTextarea.value = '';
+      });
+
+      // init homepage
+      let title = document.createElement('h1');
+      title.classList.add("title", "is-1");
+      title.textContent = "The Bible";
+      let subtitle = document.createElement('h3');
+      subtitle.classList.add("subtitle", "is-3");
+      subtitle.textContent = "English Standard Version";
+      chContent.appendChild(title);
+      chContent.appendChild(subtitle);
+
+      for (let i = 0; i < books.length; i++) {
+        let newLi = document.createElement('li');
+        let newA = document.createElement('a');
+        newA.id = `book-${i}`;
+
+        newA.textContent = books[i];
+        newA.addEventListener('click', async () => {
+          if (currBook != null) {
+            let oldBook = document.getElementById(`book-${currBook}`);
+            oldBook.classList.remove('is-active');
+          }
+          currBook = i;
+          let newBook = document.getElementById(`book-${currBook}`);
+          newBook.classList.add('is-active');
+          currChapter = 1;
+          maxChapters = await window.db.getBookContent(i);
+          let verses = await window.db.getChapterContent(i, 1);
+          let chContent = document.getElementById('chapter-content');
+          let chapterTxt = "";
+          removeVerses();
+          let chHeader = document.createElement('h2');
+          chHeader.classList.add('title', 'is-2');
+          chHeader.textContent = `Ch ${currChapter}`;
+          chContent.appendChild(chHeader);        
+          for (let j = 0; j < verses.length; j++) {
+            let verse = createVerse(verses[j], j, books[i], 1);
+            chContent.appendChild(verse);
+          }
+        });
+
+        newLi.appendChild(newA);
+        bookList.appendChild(newLi);
+      }
+    }
+
+    async function bindNav() {
+      let chContent = document.getElementById('chapter-content');
+      let prevA = document.getElementById('prev-ch');
+      prevA.addEventListener('click', async () => {
+        if (currChapter - 1 < 1)
+          return;
+        currChapter--;
+        let verses = await window.db.getChapterContent(currBook, currChapter);
+        let chapterTxt = "";
+        removeVerses();
+        let chHeader = document.createElement('h2');
+        chHeader.classList.add('title', 'is-2');
+        chHeader.textContent = `Ch ${currChapter}`
+        chContent.appendChild(chHeader);
+        for (let i = 0; i < verses.length; i++) {
+          let verse = createVerse(verses[i], i, BIBLE_BOOKS[currBook], currChapter);
+          chContent.appendChild(verse);
+        }
+      });
+
+      let nextA = document.getElementById('next-ch');
+      nextA.addEventListener('click', async () => {
+        if (currChapter + 1 > maxChapters)
+          return;
+        currChapter++;
+        let verses = await window.db.getChapterContent(currBook, currChapter);
+        let chapterTxt = "";
+        removeVerses();
+        let chHeader = document.createElement('h2');
+        chHeader.classList.add('title', 'is-2');
+        chHeader.textContent = `Ch ${currChapter}`
+        chContent.appendChild(chHeader);
+        for (let i = 0; i < verses.length; i++) {
+          let verse = createVerse(verses[i], i, BIBLE_BOOKS[currBook], currChapter);
+          chContent.appendChild(verse);
+        }
+      });
+    }
+
+    async function initAnnotations() {
+      let annotations = document.getElementById('annotations');
+      annotations.classList.add('is-hidden');
+      
+      let postBtn = document.getElementById('post-annotation');
+      postBtn.addEventListener('click', async () => {
+        if (newAnnotBody.length === 0) {
+          alert('Annotation is empty');
+          return;
+        }
+
+        let postStatus = await window.db.postAnnotation(newAnnotBody, currVerseID);
+        if (postStatus)
+          fetchAnnotations();
+        else
+          alert('Failed to save annotation');
+        newAnnotBody = "";
+        let annotTextarea = document.getElementById('annotation-textarea');
+        annotTextarea.addEventListener('input', (event) => {
+          newAnnotBody = event.target.value;
+        });
+      });
+
+      let annotTextarea = document.getElementById('annotation-textarea');
+      annotTextarea.addEventListener('input', (event) => {
+        newAnnotBody = event.target.value;
+      });
+    }
+
+    window.onload = function() {
+      loadBible();
+      bindNav();
+      initAnnotations();
+    }
+  </script>
+   
+  <style>
+    html, body {
+      overflow: hidden;
+    }
+    .annotation-card {
+      width: 15vw;
+      height: 30vh;
+      overflow: hidden;
+      z-index: 10;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    .no-select {
+      user-select: none;
+    }
+    .scrollable-l {
+      height: 100vh; 
+      overflow-y: auto; 
+    }
+    .close-annotations {
+      position: absolute;
+      top: 0;
+      right: 0;
+    }
+    .scrollable-m {
+      height: 85vh;
+      overflow-y: auto;
+      position: relative;
+    }
+    .scrollable-r {
+      height: 100vh;
+      overflow-y: auto;
+    }
+    .columns {
+      height: 100vh;
+    }
+    </style>
+  </head>
+  <body>
+    <div class="columns my-4">
+      <div class="mx-4 column is-2">
+        <aside class="menu scrollable-l">
+        <p class="menu-label">The Bible</p>
+        <ul id="book-list" class="menu-list">
+        </ul>
+      </div>
+      <div class="column auto mr-4">
+        <nav class="pagination is-centered" role="navigation" aria-label="pagination">
+          <a id="prev-ch" class="pagination-previous">&larr;</a>
+          <a id="next-ch" class="pagination-next">&rarr;</a>
+        </nav>
+        <section class="scrollable-m" id="chapter-content">
+        </section>
+      </div>
+      <div id="annotations" class="column is-one-quarter ml-0 mr-4 scrollable-r">
+        <div class="card-content" style="position: relative;">
+          <button id="close" class="close-annotations delete is-large">
+          </button>
+          <h3 id="annotations-header" class="content"></h3>
+          <div id="annotation-box" class="mb-2" style="height:60vh; overflow-y:auto;">
+
+          </div>
+          <textarea id="annotation-textarea" value="" class="textarea has-fixed-size" style="height: 10vh;" placeholder="Annotate!"></textarea>
+          <button id="post-annotation" class="button is-black mt-2">Save</button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
